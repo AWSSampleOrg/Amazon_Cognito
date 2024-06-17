@@ -1,0 +1,74 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Cognito User Pools USER_SRP
+Parameters:
+  ProjectPrefix:
+    Type: String
+    Default: ""
+
+Resources:
+  #-------------------------------------------------------
+  # Cognito
+  #-------------------------------------------------------
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub ${ProjectPrefix}UserPool
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: verified_email
+            Priority: 1
+      AliasAttributes:
+        - email
+      AutoVerifiedAttributes:
+        - email
+        - phone_number
+      EnabledMfas:
+        - SMS_MFA
+        - SOFTWARE_TOKEN_MFA
+      MfaConfiguration: OPTIONAL
+      Schema:
+        - AttributeDataType: String
+          Name: email
+          Required: True
+      SmsConfiguration:
+        ExternalId: String
+        SnsCallerArn: !Sub ${Cognito.Arn}
+
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      AccessTokenValidity: 60
+      ClientName: UserPool-client
+      GenerateSecret: false # Do not create Client Secret
+      ExplicitAuthFlows:
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      IdTokenValidity: 60
+      PreventUserExistenceErrors: ENABLED
+      RefreshTokenValidity: 43200
+      TokenValidityUnits:
+        AccessToken: minutes
+        IdToken: minutes
+        RefreshToken: minutes
+      UserPoolId: !Ref UserPool
+
+  # ------------------------------------------------------------#
+  # IAM
+  # ------------------------------------------------------------#
+  Cognito:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - cognito-idp.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSNSFullAccess
+      Path: /
+      RoleName: !Sub ${ProjectPrefix}SnsRole
